@@ -1,0 +1,63 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Dec  9 20:14:31 2021
+
+@author: HP
+"""
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras import datasets,layers,models
+import matplotlib.pyplot as plt
+%matplotlib inline
+
+# load and split the dataset
+(train_images,train_labels),(test_images,test_labels) = datasets.cifar10.load_data()
+
+# normalize the pixel values to be between 0 & 1
+train_images,test_images = train_images / 255.0 , test_images / 255.0
+
+class_names = ['airplane','automobile','bird','cat','deer','dog','frog','horse','ship','truck']
+
+
+# CNN architecture
+print('Shape of our images:',train_images.shape)
+model = models.Sequential()
+model.add(layers.Conv2D(32,(3,3),activation = 'relu',input_shape = (32,32,3))) 
+# no. of filters = 32, shape of those filters = 3x3, and the input image shape is 32x32x3,
+# where '3' is for rgb
+model.add(layers.MaxPooling2D((2,2))) # 2x2 sample size with the stride of 2
+model.add(layers.Conv2D(64,(3,3), activation='relu')) # here we don't need to put the 
+# input_shape as they will figureout on their own
+model.add(layers.MaxPooling2D((2,2)))
+model.add(layers.Conv2D(64,(3,3), activation ='relu'))
+
+# model summary
+model.summary()
+
+# adding dense layers
+model.add(layers.Flatten()) # reduce the dimension of the featuremaps to 1(well basically to a list)
+model.add(layers.Dense(64,activation = 'relu')) # fully connected dense layers
+model.add(layers.Dense(10)) # 10 nodes for 10 classes 
+
+# training / compiling the model
+model.compile( optimizer = 'adam',
+              loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits= True),
+              metrics = ['accuracy'])
+
+history = model.fit(train_images,train_labels,epochs = 10,
+                    validation_data = (test_images,test_labels))        
+print('Done')
+
+# evaluating the model
+test_loss,test_acc = model.evaluate(test_images,test_labels,verbose = 2)
+print('The Accuracy is:',test_acc)
+
+# making prediction
+n = 590
+prediction = model.predict(test_images)
+print('Model_class:',class_names[np.argmax(prediction[n])])
+print('True class:',class_names[test_labels[n][0]])
+plt.figure()
+plt.imshow(test_images[n])
+plt.colorbar()
+plt.show()
