@@ -1,0 +1,51 @@
+# Importing all the libraries
+import tensorflow as tf
+from tensorflow import keras
+import matplotlib.pyplot as plt
+import numpy as np
+%matplotlib inline
+
+fashion_data  = keras.datasets.fashion_mnist # loading the data 
+(train_images,train_labels),(test_images,test_labels) = fashion_data.load_data() # spliting it into training & testing set
+
+# CLASS names
+class_names = ['T-shirt','Trouser','Pullover','Dress','Coat','Sandal','Shirt','Sneaker','Bag','boot']
+
+# checking the shape of the traing set
+print (train_images.shape)
+print(tf.rank(test_images))
+
+print(train_labels[:10])
+
+
+# Preprocessing
+# diving by 255 so that the range of the pixel value remains between 0-1
+train_images = train_images / 255.0
+test_images = test_images / 255.0
+
+# building the architechture of our ANN model
+
+model = keras.Sequential([
+    keras.layers.Flatten(input_shape = (28,28)), # input layer1
+    keras.layers.Dense(140, activation= 'relu'),# hidden layer2 with 128 nodes and 'relu' as an activation function
+    keras.layers.Dense(40,activation = 'relu'),# hidden layer3 with 40 nodes and 'relu' as an activation function
+    keras.layers.Dense(10,activation= 'softmax') # output layer4 with 10 nodes as we have 10 classes and 'sofmax' as an activation function
+    ])
+
+# compling the model
+
+model.compile( optimizer = 'adam',
+              loss = 'sparse_categorical_crossentropy',
+              metrics = ['accuracy'])
+
+# training the model
+
+model.fit( train_images,
+          train_labels,
+          epochs = 10, # the model will be trained by the same images for 10 times
+          batch_size = 32) # batches will provide a batch of images at a time for each epoch to train the model
+
+# testing our model
+
+test_loss, test_acc = model.evaluate(test_images,test_labels,verbose = 1)
+print('Test accuracy:',test_acc)
