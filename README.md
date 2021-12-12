@@ -1,2 +1,2 @@
 # Image-Classification
-Using Simple ANN to classify the Images
+Using Simple ANN, CNN, and Transfor learning to classify the images
