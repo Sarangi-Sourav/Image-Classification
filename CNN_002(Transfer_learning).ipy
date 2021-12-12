@@ -1,0 +1,137 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sat Dec 11 15:01:56 2021
+
+@author: HP
+"""
+
+# Importing all the required libraries
+import numpy as np
+import matplotlib.pyplot as plt
+import tensorflow as tf
+from tensorflow import keras
+%matplotlib inline
+
+# importing dataset
+import tensorflow_datasets as tfds
+tfds.disable_progress_bar()
+
+# splitting the data mutually into 80% training, 10% testing, and 10% validation
+(raw_train, raw_validation, raw_test), metadata = tfds.load(
+'cats_vs_dogs',
+split=[
+   tfds.Split.TRAIN.subsplit(tfds.percent[:80]),
+   tfds.Split.TRAIN.subsplit(tfds.percent[80:90]),
+   tfds.Split.TRAIN.subsplit(tfds.percent[90:])
+],
+with_info=True,
+as_supervised=True,
+)
+
+# create a function object that we can use to get the labels
+get_label_name = metadata.features['label'].int2str
+
+# display 2 images of the dataset
+for image, label in raw_train.take(4):
+    plt.figure()
+    plt.imshow(image)
+    plt.title(get_label_name(label))
+    
+
+# reshaping the images as they are all of different sizes   
+new_size = 170 # all the images will be resized to 160 x 160
+
+def format_img(image,label):
+    """ return an image that is reshaped to new_size """
+    image = tf.cast(image,tf.float32) # convert each pixel value to float
+    image = (image/(255/2)) - 1 # reshaping the image size
+    image = tf.image.resize(image,(new_size,new_size))
+    return image,label
+
+# applying the format_img function to all of our data
+train = raw_train.map(format_img)
+validate = raw_validation.map(format_img)
+test = raw_test.map(format_img)
+
+# let's take a look at our reshaped images now
+for image, label in train.take(4):
+    plt.figure()
+    plt.imshow(image)
+    plt.colorbar()
+    plt.title(get_label_name(label))   
+    
+# let's shuffle and batch the images
+batch_size = 32
+shuffle_buffer_size = 1000
+
+train_batches = train.shuffle(shuffle_buffer_size).batch(batch_size)
+validation_batch = validate.batch(batch_size)
+test_batch = test.batch(batch_size)
+
+for image, label in raw_train.take(2):
+    print('Original image shape:',image.shape)
+    
+for image, label in train.take(2):
+    print('New image shape:',image.shape)    
+ 
+# PICKING A PRETRAINED MODEL
+
+img_shape = (new_size,new_size,3)
+
+# create  the base model from a pretrained model MobileNetV2
+base_model = keras.applications.MobileNetV2(input_shape = img_shape,
+                                            include_top = False, # asking for adding top of the networks i.e. the classifier or not
+                                            weights='imagenet')
+    
+print(base_model.summary())
+
+for image,_ in train_batches.take(1):
+    pass
+feature_batch = base_model(image)
+print(feature_batch.shape) # (32, 6, 6, 1280)
+
+# FREZZING THE BASE
+base_model.trainable = False
+
+print(base_model.summary()) # (None, 6, 6, 1280)
+
+# ADDING OUR CLASSIFIER
+global_avg_layer = keras.layers.GlobalAveragePooling2D() # instead of flattening the feature map we will use a global 
+# average pooling layer that will average the entire 6 x 6 area of each 2d feature map and return to us a single 1280 element vector
+# per filter (Gl (None, 1280)
+
+# Finally we will add a Dense prediction layer with a single neuron (node) as it's a binary classification
+prediction_layer = keras.layers.Dense(1)#,activation = 'softmax')
+
+# combining these together a making a model
+model = keras.Sequential([
+    base_model,
+    global_avg_layer,
+    prediction_layer])
+
+print(model.summary()) # (None, 1) 
+
+# TRAINING THE MODEL
+base_learning_rate = 0.0001
+model.compile(optimizer = keras.optimizers.RMSprop(lr = base_learning_rate),
+              loss = keras.losses.BinaryCrossentropy(from_logits=True), # as we are performing binary classification
+              metrics = ['accuracy'])
+
+# Let's evaluate the model before training it on our new images 
+initial_epochs = 3
+validation_steps = 20
+
+loss0,acc0 = model.evaluate(validation_batch,steps = validation_steps) # loss: 0.9994 - accuracy: 0.4766
+
+# training the model on our image
+history = model.fit(train_batches,
+                    epochs = initial_epochs,
+                    validation_data = validation_batch)
+
+acc = history.history['accuracy']
+print(acc) # loss: 0.0627 - accuracy: 0.9785
+
+# saving the model
+model.save('cats_vs_dogs_model.h5') # for saving the model in keras
+new_model = keras.models.load_model('cats_vs_dogs_model.h5')
+
